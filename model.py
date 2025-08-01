@@ -719,67 +719,6 @@ class ModalityInfuser(nn.Module):
         return h
 
 
-# PatchGAN Discriminator (https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/models/networks.py#L538)
-class Discriminator(nn.Module):
-    def __init__(self, channels=1, num_filters_last=32, n_layers=3, n_classes=4, ixi=False):
-        super(Discriminator, self).__init__()
-
-        layers = [nn.Conv2d(channels, num_filters_last, 4, 2, 1), nn.LeakyReLU(0.2)]
-        num_filters_mult = 1
-
-        for i in range(1, n_layers + 1):
-            num_filters_mult_last = num_filters_mult
-            num_filters_mult = min(2 ** i, 8)
-            layers += [
-                nn.Conv2d(num_filters_last * num_filters_mult_last, num_filters_last * num_filters_mult, 4,
-                          2 if i < n_layers else 1, 1, bias=False),
-                nn.GroupNorm(8, num_filters_last * num_filters_mult),
-                nn.LeakyReLU(0.2, True)
-            ]
-        self.model = nn.Sequential(*layers)
-        self.final = nn.Conv2d(num_filters_last * num_filters_mult, 1, 4, 1, 1, bias=False)
-        if ixi:
-            self.classifier = nn.Conv2d(num_filters_last * num_filters_mult, n_classes, 31, bias=False)
-        else:
-            self.classifier = nn.Conv2d(num_filters_last * num_filters_mult, n_classes, 29, bias=False)
-
-    def forward(self, x):
-        features = self.model(x)
-        logits = self.final(features)
-        labels = self.classifier(features)
-        return logits, labels.view(labels.size(0), labels.size(1))
-
-
-class Discriminator_v2(nn.Module):
-    def __init__(self, channels=1, num_filters_last=32, n_layers=3, n_classes=4, ixi=False):
-        super().__init__()
-
-        layers = [nn.Conv2d(channels, num_filters_last, 4, 2, 1), nn.LeakyReLU(0.2)]
-        num_filters_mult = 1
-
-        for i in range(1, n_layers + 1):
-            num_filters_mult_last = num_filters_mult
-            num_filters_mult = min(2 ** i, 8)
-            layers += [
-                nn.Conv2d(num_filters_last * num_filters_mult_last, num_filters_last * num_filters_mult, 4,
-                          2 if i < n_layers else 1, 1, bias=False),
-                nn.GroupNorm(8, num_filters_last * num_filters_mult),
-                nn.LeakyReLU(0.2, True)
-            ]
-        self.model = nn.Sequential(*layers)
-        self.final = nn.Conv2d(num_filters_last * num_filters_mult, 1, 4, 1, 1, bias=False)
-        if ixi:
-            self.classifier = nn.Conv2d(num_filters_last * num_filters_mult, n_classes, 31, bias=False)
-        else:
-            self.classifier = nn.Conv2d(num_filters_last * num_filters_mult, n_classes, 29, bias=False)
-
-    def forward(self, x):
-        features = self.model(x)
-        logits = self.final(features)
-        labels = self.classifier(features)
-        return logits, labels.view(labels.size(0), labels.size(1))
-
-
 class FlashAttentionBlock(nn.Module):
     def __init__(self, hidden_size, n_heads, dropout=0.0):
         super().__init__()

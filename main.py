@@ -1,55 +1,35 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from src.models.hf_gan import HFGAN_3D
-from src.data.dataset import BrainDataset3D, ULTIMATE_brain_coll_3d
+from model import HFGAN_3D
+from utils import BrainDataset3D, ULTIMATE_brain_coll_3d
 from pathlib import Path
 import shutil
 import os
-from tqdm import tqdm
 import nibabel as nib
-from src.utils.saving import save_tensor_to_nii
-from argparse import ArgumentParser
+from utils import save_tensor_to_nii
 import numpy as np
 import random
+from tqdm import tqdm
 
 seed = 0
 random.seed(seed)
 np.random.seed(seed)
 torch.manual_seed(seed)
-torch.cuda.manual_seed(seed)
-torch.cuda.manual_seed_all(seed)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
-parser = ArgumentParser()
-parser.add_argument('--id', type=str, required=True, help='Provide the base identifier of the checkpoint.\n' +
-                                                          'Ex: if the checkpoint is at /work/tesi_ocarpentiero/checkpoints/final/run_14_always_three.safetensors,\n' +
-                                                          'the id should be: --id run_14_always_three')
-parser.add_argument('--view', type=str, default='axi', help='Provide one of: axi , cor , sag')
-parser.add_argument('--more', type=str, default='',
-                    help='Provide a string that will be concatenaded with the id during the saving phase')
-args = parser.parse_args()
-id = args.id
-view = args.view
-more = args.more
+view = os.environ['VIEW']
 
-# Original and immutable val dataset
-input_path = Path(f'/work/tesi_ocarpentiero/brats3d/pseudo_random/original')
-
-# These paths will only contain the reconstructed modality, in nnunet_convention
-output_path_gli = Path(f'/work/tesi_ocarpentiero/brats3d/pseudo_random/recon_gli_{id}{more}')
-output_path_met = Path(f'/work/tesi_ocarpentiero/brats3d/pseudo_random/recon_met_{id}{more}')
+input_path = Path(os.environ['INPUT_DIR'])
+output_path = Path(os.environ['OUTPUT_DIR'])
 
 # Remember that only checkpoints available in the "final" directory will be usable
-weights_file = Path(f'/work/tesi_ocarpentiero/checkpoints/final/{id}.safetensors')
+weights_file = Path('checkpoint/model.safetensors')
 
-infuse_view = False
-grouped_encoder = False
-
-# Minor parameters for the model
-if '24' in id or '25' in id:
-    grouped_encoder = True
-if '25' in id:
-    infuse_view = True
+infuse_view = os.environ['INFUSE_VIEW']
+grouped_encoder = os.environ['GRP_ENCODER']
 
 # Hardcoded pre-computed scores for the gli + met dataset
 means = torch.tensor([1066.3375, 781.2247, 510.9852, 673.4393])
@@ -70,21 +50,12 @@ dataloader = DataLoader(dataset=dataset,
                         collate_fn=ULTIMATE_brain_coll_3d)
 assert dataloader.batch_size == 1, 'KEEP THE BATCH SIZE OF THE DATALOADER TO 1 PLEASE DO NOT CHANGE THE BATCH SIZE PLSPLS'
 
-if os.path.exists(output_path_gli_complete):
-    shutil.rmtree(output_path_gli_complete)
-os.makedirs(output_path_gli_complete)
-
-if os.path.exists(output_path_met_complete):
-    shutil.rmtree(output_path_met_complete)
-os.makedirs(output_path_met_complete)
-
-if os.path.exists(output_path_gli):
-    shutil.rmtree(output_path_gli)
-os.makedirs(output_path_gli)
-
-if os.path.exists(output_path_met):
-    shutil.rmtree(output_path_met)
-os.makedirs(output_path_met)
+if os.path.exists(output_path):
+    for file_path in output_path.iterdir():
+        if os.path.isfile(file_path) or os.path.islink(file_path):
+            os.unlink(file_path)
+        elif os.path.isdir(file_path):
+            shutil.rmtree(file_path)
 
 # Our cutting edge technology, super efficient, so wise and powerful, wrapper model (it sucks)
 model = HFGAN_3D(view=view, weights_file=weights_file, infuse_view=infuse_view, grouped_encoder=grouped_encoder)
@@ -93,43 +64,20 @@ model = HFGAN_3D(view=view, weights_file=weights_file, infuse_view=infuse_view, 
 for element in tqdm(dataloader, total=len(dataloader)):
     brains = element['images']
     missing_modalities = element['missing_modalities']
-    recon, everything = model(brains, missing_modalities)
+    recon, _ = model(brains, missing_modalities)
 
     headers = element['image_headers'][0]
     affines = element['image_affines'][0]
-    # De-normalizations
-    everything = (everything * stds.view(1, 4, 1, 1, 1)) + means.view(1, 4, 1, 1, 1)
-    everything[everything < 0] = 0
 
+    # De-normalizations
     recon = (recon * stds[missing_modalities.item()]) + means[missing_modalities.item()]
     recon[recon < 0] = 0
 
-    # The mets are saved with the brats convention
-    if 'MET' in str(Path(element['ids'][0]).name):
-        output_path = output_path_met_complete
-        os.makedirs(output_path / Path(element['ids'][0]).name)
-        for i in range(4):
-            save_path = output_path / Path(element['ids'][0]).name / (
-                        str(Path(element['ids'][0]).name) + '-' + modal_name_list_brats[i] + '.nii.gz')
-            save_tensor_to_nii(everything[:, i:i + 1].squeeze(0), save_path, affines[i], headers[i])
-
-            # The single reconstructed modalities are saved
-            if i == missing_modalities.item():
-                save_path = output_path_met / (
-                            str(Path(element['ids'][0]).name) + '_' + modal_name_list_nnunet[i] + '.nii.gz')
-                save_tensor_to_nii(recon.squeeze(0), save_path, affines[i], headers[i])
-    # The glis are saved with the nnunet convention
-    elif 'GLI' in str(Path(element['ids'][0]).name):
-        output_path = output_path_gli_complete
-        for i in range(4):
-            save_path = output_path / (str(Path(element['ids'][0]).name) + '_' + modal_name_list_nnunet[i] + '.nii.gz')
-            save_tensor_to_nii(everything[:, i:i + 1].squeeze(0), save_path, affines[i], headers[i])
-            if i == missing_modalities.item():
-                save_path = output_path_gli / (
-                            str(Path(element['ids'][0]).name) + '_' + modal_name_list_nnunet[i] + '.nii.gz')
-                save_tensor_to_nii(recon.squeeze(0), save_path, affines[i], headers[i])
-    else:
-        raise RuntimeError('Invalid type of tumor!')
+    i = missing_modalities.item()
+    os.makedirs(output_path / Path(element['ids'][0]).name)
+    save_path = output_path / Path(element['ids'][0]).name / (
+            str(Path(element['ids'][0]).name) + '-' + modal_name_list_brats[i] + '-inference.nii.gz')
+    save_tensor_to_nii(recon.squeeze(0), save_path, affines[i], headers[i])
 
 print('End of the generation phase!')
 

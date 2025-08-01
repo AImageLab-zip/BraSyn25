@@ -8,9 +8,12 @@ Remember to:
 - Mount the right input/output directories
 - Test the Docker before submission!
 
-# How to run on cluster 
-srun docker run \
-  -v /work/tesi_ocarpentiero/brats3d/pseudo_random/original:/input:ro
-  -v /work/tesi_ocarpentiero/brats3d/pseudo_random/recon:/output
-  image-name \
+# Docker tutorial:
+local:   $ sudo docker build -t brats_2025 .
+local:   $ sudo enroot import -o brats_2025.sqsh dockerd://brats_2025:latest
+- Transfer brats_2025.sqsh to the cluster using sftp
+cluster: $ srun --container-image=enroot:brats_2025.sqsh
+
+
+
 

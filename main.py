@@ -23,7 +23,7 @@ if torch.cuda.is_available():
 view = os.environ['VIEW']
 
 input_path = Path(os.environ['INPUT_DIR'])
-output_path = Path(osdo.environ['OUTPUT_DIR'])
+output_path = Path(os.environ['OUTPUT_DIR'])
 
 # Remember that only checkpoints available in the "final" directory will be usable
 weights_file = Path('checkpoint/model.safetensors')
@@ -74,9 +74,8 @@ for element in tqdm(dataloader, total=len(dataloader)):
     recon[recon < 0] = 0
 
     i = missing_modalities.item()
-    os.makedirs(output_path / Path(element['ids'][0]).name)
-    save_path = output_path / Path(element['ids'][0]).name / (
-            str(Path(element['ids'][0]).name) + '-' + modal_name_list_brats[i] + '-inference.nii.gz')
+    save_path = output_path / (
+            str(Path(element['ids'][0]).name) + '-' + modal_name_list_brats[i] + '.nii.gz')
     save_tensor_to_nii(recon.squeeze(0), save_path, affines[i], headers[i])
 
 print('End of the generation phase!')

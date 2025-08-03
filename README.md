@@ -18,18 +18,24 @@ local:   $ sudo docker build -t brats_2025 .
 - Convert the docker into a sqsh file, compatible with enroot
 local:   $ sudo enroot import -o brats_2025.sqsh dockerd://brats_2025:latest
 - Transfer brats_2025.sqsh to the cluster using sftp/something fancier
-- Now get a job running on a node
-cluster: $ srun --gres=gpu:1 --time=4:00:00 --partition=all_serial --cpus-per-task=8 --mem=20G --account=tesi_ocarpentiero --nodelist=ailb-login-03 --pty bash 
 - Time to run the thing!
-cluster: $ enroot remove brats_2025 # IF IT'S NOT YOUR FIRST TIME FOLLOWING THIS TUTORIAL <3
-cluster: $ enroot create --name brats_2025 path/to/your/beautiful/file.sqsh
-- enroot start \
-  --mount /work/tesi_ocarpentiero/brats3d/pseudo_random/original:/input:ro,x-create=dir \
-  --mount /work/tesi_ocarpentiero/brats3d/pseudo_random/recon:/output:rw,x-create=dir \
-  brats-2025
+  cluster: $ srun --gres=gpu:1 --time=4:00:00 --partition=all_usr_prod --cpus-per-task=8 --mem=20G --account=tesi_ocarpentiero  --pty bash 
+  cluster: $ enroot remove brats_2025 # IF IT'S NOT YOUR FIRST TIME FOLLOWING THIS TUTORIAL on that srun <3
+  cluster: $ enroot create --name brats_2025 path/to/your/beautiful/file.sqsh
+  cluster: $ enroot start  \
+             --mount /work/tesi_ocarpentiero/brats3d/pseudo_random/original:/input:rw \
+             --mount /work/tesi_ocarpentiero/brats3d/pseudo_random/recon:/output:rw \
+             brats_2025
 - Watch as this tutorial fails you completely since everything has to go wrong
 
-
-
-
+# Docker tutorial with just the commands
+local:   $ sudo docker build -t brats_2025 .
+local:   $ sudo enroot import -o brats_2025.sqsh dockerd://brats_2025:latest
+cluster: $ srun --gres=gpu:1 --time=4:00:00 --partition=all_usr_prod --cpus-per-task=8 --mem=20G --account=tesi_ocarpentiero  --pty bash 
+cluster: $ enroot remove brats_2025 # IF IT'S NOT YOUR FIRST TIME FOLLOWING THIS TUTORIAL on that srun <3
+cluster: $ enroot create --name brats_2025 path/to/your/beautiful/file.sqsh
+cluster: $ enroot start  \
+           --mount /work/tesi_ocarpentiero/brats3d/pseudo_random/original:/input:rw \
+           --mount /work/tesi_ocarpentiero/brats3d/pseudo_random/recon:/output:rw \
+           brats_2025
 

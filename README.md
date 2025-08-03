@@ -8,6 +8,9 @@ Remember to:
 - Mount the right input/output directories
 - Test the Docker before submission!
 
+# The following tutorial crashed due to a problem with cuda drivers.
+The docker seems to work on my local machine...but some more tests should still be done...
+I hope i didn't break anything with the latest edits
 # Docker tutorial:
 - If your machine runs Windows or ...macOS (??????????????????') you should eradicate your installation and install Ubuntu / use a VM (cringe option)
 - Check if enroot is installed. If not, follow this tutorial: https://github.com/NVIDIA/enroot/blob/master/doc/installation.md

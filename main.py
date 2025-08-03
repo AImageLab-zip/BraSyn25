@@ -22,8 +22,8 @@ if torch.cuda.is_available():
 
 view = os.environ['VIEW']
 
-input_path = Path(os.environ['INPUT_DIR'])
-output_path = Path(os.environ['OUTPUT_DIR'])
+input_path = Path('/input')
+output_path = Path('/output')
 
 # Remember that only checkpoints available in the "final" directory will be usable
 weights_file = Path('checkpoint/model.safetensors')

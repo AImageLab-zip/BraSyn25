@@ -12,13 +12,13 @@ from einops import rearrange
 import torch.nn.functional as F
 from torch.nn import MultiheadAttention
 
-torch.backends.cuda.enable_flash_sdp(True)
+#torch.backends.cuda.enable_flash_sdp(True)
 import os
 from pathlib import Path
 from typing import Tuple
 from abc import ABC, abstractmethod
 from safetensors.torch import load_file
-
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # os.environ["TORCH_LOGS"] = "+dynamo,+inductor"
 
@@ -810,7 +810,7 @@ class HFGAN(nn.Module):
 
 class ViewGenerator(ABC):
     def __init__(self, model):
-        self.model = model.cuda()
+        self.model = model.to(device)
 
     @abstractmethod
     def generate(self, brain, missing_modality) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -827,7 +827,7 @@ class AxiGenerator(ViewGenerator):
 
     def generate(self, brain, missing_modality) -> Tuple[torch.Tensor, torch.Tensor]:
         assert brain.shape[0] == 1, 'Do not give batched brains to this method bro'
-        brain = brain.cuda().squeeze(0)  # (1, 4, 240, 240, 155) --> (4, 240, 240, 155)
+        brain = brain.squeeze(0).to(device)  # (1, 4, 240, 240, 155) --> (4, 240, 240, 155)
         recon_volume_list = []
         for i in range(0, 155, self.batch_size):
             brain_slice = brain[:, :, :, i:i + self.batch_size]  # (4, 240, 240, 31)
@@ -835,9 +835,9 @@ class AxiGenerator(ViewGenerator):
                 recon, _ = self.model(brain_slice.permute(3, 0, 1, 2).contiguous(),
                                       [[x for x in range(4) if x != (missing_modality)] for _ in
                                        range(self.batch_size)],
-                                      torch.full((self.batch_size,), missing_modality, device='cuda'),
+                                      torch.full((self.batch_size,), missing_modality, device=device),
                                       train_mode=False,
-                                      views=torch.full((self.batch_size,), 0, device='cuda'))
+                                      views=torch.full((self.batch_size,), 0, device=device))
 
             recon = recon.permute(1, 2, 3, 0)  # (31, 1, 240, 240) --> (1, 240, 240, 31)
 
@@ -846,7 +846,7 @@ class AxiGenerator(ViewGenerator):
         recon_volume = recon_volume.unsqueeze(0)  # (1, 1, 240, 240, 155)
         brain_recon = brain.clone().unsqueeze(0).cpu()
 
-        majority = torch.zeros((240, 240, 155), dtype=torch.int32).cuda()
+        majority = torch.zeros((240, 240, 155), dtype=torch.int32).to(device)
         for i in range(4):
             if i == missing_modality.item():
                 continue
@@ -865,7 +865,7 @@ class SagGenerator(ViewGenerator):
 
     def generate(self, brain, missing_modality) -> Tuple[torch.Tensor, torch.Tensor]:
         assert brain.shape[0] == 1, 'Do not give batched brains to this method bro'
-        brain = brain.cuda().squeeze(0)  # (1, 4, 240, 240, 155) --> (4, 240, 240, 155)
+        brain = brain.squeeze(0).to(device)  # (1, 4, 240, 240, 155) --> (4, 240, 240, 155)
         recon_volume_list = []
         for i in range(0, 240, self.batch_size):
             brain_slice = brain[:, i:i + self.batch_size, :, :]  # (4, 40, 240, 155)
@@ -874,9 +874,9 @@ class SagGenerator(ViewGenerator):
                 recon, _ = self.model(brain_slice.permute(1, 0, 2, 3).contiguous(),  # (04, 4, 240, 240)
                                       [[x for x in range(4) if x != (missing_modality)] for _ in
                                        range(self.batch_size)],
-                                      torch.full((self.batch_size,), missing_modality, device='cuda'),
+                                      torch.full((self.batch_size,), missing_modality, device=device),
                                       train_mode=False,
-                                      views=torch.full((self.batch_size,), 1, device='cuda'))
+                                      views=torch.full((self.batch_size,), 1, device=device))
 
             recon = recon.permute(1, 0, 2, 3)  # (40, 1, 240, 240) --> (1, 40, 240, 240)
             recon = recon[:, :, :, 42:155 + 42]  # (1, 40, 240, 155)
@@ -887,7 +887,7 @@ class SagGenerator(ViewGenerator):
 
         brain_recon = brain.clone().unsqueeze(0).cpu()
 
-        majority = torch.zeros((240, 240, 155), dtype=torch.int32).cuda()
+        majority = torch.zeros((240, 240, 155), dtype=torch.int32).to(device)
         for i in range(4):
             if i == missing_modality.item():
                 continue
@@ -906,7 +906,7 @@ class CorGenerator(ViewGenerator):
 
     def generate(self, brain, missing_modality) -> Tuple[torch.Tensor, torch.Tensor]:
         assert brain.shape[0] == 1, 'Do not give batched brains to this method bro'
-        brain = brain.cuda().squeeze(0)  # (1, 4, 240, 240, 155) --> (4, 240, 240, 155)
+        brain = brain.squeeze(0).to(device)  # (1, 4, 240, 240, 155) --> (4, 240, 240, 155)
         recon_volume_list = []
         for i in range(0, 240, self.batch_size):
             brain_slice = brain[:, :, i:i + self.batch_size, :]  # (4, 240, 40, 155)
@@ -915,9 +915,9 @@ class CorGenerator(ViewGenerator):
                 recon, _ = self.model(brain_slice.permute(2, 0, 1, 3).contiguous(),  # (04, 4, 240, 240)
                                       [[x for x in range(4) if x != (missing_modality)] for _ in
                                        range(self.batch_size)],
-                                      torch.full((self.batch_size,), missing_modality, device='cuda'),
+                                      torch.full((self.batch_size,), missing_modality, device=device),
                                       train_mode=False,
-                                      views=torch.full((self.batch_size,), 2, device='cuda'))
+                                      views=torch.full((self.batch_size,), 2, device=device))
 
             recon = recon.permute(1, 2, 0, 3)  # (40, 1, 240, 240) --> (1, 240, 40, 240)
             recon = recon[:, :, :, 42:155 + 42]  # (1, 40, 240, 155)
@@ -927,7 +927,7 @@ class CorGenerator(ViewGenerator):
         recon_volume = recon_volume.unsqueeze(0)  # (1, 1, 240, 240, 155)
         brain_recon = brain.clone().unsqueeze(0).cpu()
 
-        majority = torch.zeros((240, 240, 155), dtype=torch.int32).cuda()
+        majority = torch.zeros((240, 240, 155), dtype=torch.int32).to(device)
         for i in range(4):
             if i == missing_modality.item():
                 continue
@@ -990,7 +990,7 @@ class HFGAN_3D(nn.Module):
         assert weights_file.exists() and weights_file.is_file and weights_file.is_absolute, f'Something wrong with the weights file: {str(weights_file)}'
 
         model = HFGAN(dim=64, num_inputs=4, num_outputs=1, dim_mults=(1, 2, 4, 8, 10), n_layers=4, skip=True,
-                      blocks=False, grouped_encoder=grouped_encoder, infuse_view=infuse_view).cuda()
+                      blocks=False, grouped_encoder=grouped_encoder, infuse_view=infuse_view).to(device)
         state_dict = load_file(weights_file)
         state_dict = {k.replace("module.", "", 1): v for k, v in state_dict.items()}
         model.load_state_dict(state_dict)

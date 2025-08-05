@@ -13,7 +13,7 @@ RUN mkdir -p /input /output
 ARG RUN_ID=24
 
 # view: choose one of: axi, sag, cor
-ENV VIEW=axi
+ENV VIEW=sag
 
 # change these according to the run number
 ENV GRP_ENCODER=true

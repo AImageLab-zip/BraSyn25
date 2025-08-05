@@ -28,8 +28,8 @@ output_path = Path('/output')
 # Remember that only checkpoints available in the "final" directory will be usable
 weights_file = Path('checkpoint/model.safetensors')
 
-infuse_view = os.environ['INFUSE_VIEW']
-grouped_encoder = os.environ['GRP_ENCODER']
+infuse_view = (os.environ['INFUSE_VIEW'].lower() == 'true')
+grouped_encoder = (os.environ['GRP_ENCODER'].lower() == 'true')
 
 # Hardcoded pre-computed scores for the gli + met dataset
 means = torch.tensor([1066.3375, 781.2247, 510.9852, 673.4393])
@@ -46,7 +46,7 @@ dataset = BrainDataset3D(dataset_dirs=input_path)
 dataloader = DataLoader(dataset=dataset,
                         batch_size=1,
                         shuffle=False,
-                        num_workers=4,
+                        num_workers=1,
                         collate_fn=ULTIMATE_brain_coll_3d)
 assert dataloader.batch_size == 1, 'KEEP THE BATCH SIZE OF THE DATALOADER TO 1 PLEASE DO NOT CHANGE THE BATCH SIZE PLSPLS'
 

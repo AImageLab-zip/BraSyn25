@@ -1,44 +1,98 @@
-# BraSyn25
-Method for cross-modal generation of MRI modalities, submitted to the BraTS 2025 challenge (BraSyn task)
+# No More Slice Wars: Just code
+This repository contains the code and configuration files used for our submission to the 
+Brain Tumor Segmentation Challenge (BraTS 2025), Task 8.
+## 0. System requirements
+This code was tested on ubuntu 22.04 LTS and CUDA 12.6, but will work on Windows too. 
+## 1. Repository Structure
 
-# How to run this
-Remember to:
-- Have an internet connection (checkpoint downloading would fail otherwise)
-- Select a meaningful configuration of RUN_ID and VIEW in the Dockerfile
-- Mount the right input/output directories
-- Test the Docker before submission!
+```
+BraSyn25/
+├── final_eval/ # Folder for the final local evaluation
+│   └── sbatchable_scripts/     # Sbatch files specific for evaluation
+├── slurm/                      # Examples of sbatch files used during training
+│   ├── sbatchable_scripts/
+│   └── segmenter_script/
+├── src/
+│   ├── data/                   # Dataset code, collate functions and stuff
+│   ├── models/                 # Pytorch models
+│   ├── training/               # Training scripts
+│   └── utils/                  # Utilities
+└── README.md                   # This file! :)
+```
 
-# The following tutorial crashed due to a problem with cuda drivers.
-The docker seems to work on my local machine...but some more tests should still be done...
-I hope i didn't break anything with the latest edits
-# Docker tutorial:
-- If your machine runs Windows or ...macOS (??????????????????') you should eradicate your installation and install Ubuntu / use a VM (cringe option)
-- Check if enroot is installed. If not, follow this tutorial: https://github.com/NVIDIA/enroot/blob/master/doc/installation.md
-- After cloning the repo and checking everything is ok, cd to the project directory and build locally the docker
-local:   $ sudo docker build -t brats_2025 .
-- Uh oh! There is a 69% probability of you forgetting to install docker
-- Follow this https://docs.docker.com/desktop/setup/install/linux/ubuntu/
-- Convert the docker into a sqsh file, compatible with enroot
-local:   $ sudo enroot import -o brats_2025.sqsh dockerd://brats_2025:latest
-- Transfer brats_2025.sqsh to the cluster using sftp/something fancier
-- Time to run the thing!
-  cluster: $ srun --gres=gpu:1 --time=4:00:00 --partition=all_usr_prod --cpus-per-task=8 --mem=20G --account=tesi_ocarpentiero  --pty bash 
-  cluster: $ enroot remove brats_2025 # IF IT'S NOT YOUR FIRST TIME FOLLOWING THIS TUTORIAL on that srun <3
-  cluster: $ enroot create --name brats_2025 path/to/your/beautiful/file.sqsh
-  cluster: $ enroot start  \
-             --mount /work/tesi_ocarpentiero/brats3d/pseudo_random/original:/input:rw \
-             --mount /work/tesi_ocarpentiero/brats3d/pseudo_random/recon:/output:rw \
-             brats_2025
-- Watch as this tutorial fails you completely since everything has to go wrong
+## 2. Data Preparation
+This year's challenge used 3 different datasets:
+- Glioma.
+- Metastasis.
+- Metastasis - add (additional samples).
 
-# Docker tutorial with just the commands
-local:   $ sudo docker build -t brats_2025 .
-local:   $ sudo enroot import -o brats_2025.sqsh dockerd://brats_2025:latest
-cluster: $ srun --gres=gpu:1 --time=4:00:00 --partition=all_usr_prod --cpus-per-task=8 --mem=20G --account=tesi_ocarpentiero  --pty bash 
-cluster: $ enroot remove brats_2025 # IF IT'S NOT YOUR FIRST TIME FOLLOWING THIS TUTORIAL on that srun <3
-cluster: $ enroot create --name brats_2025 path/to/your/beautiful/file.sqsh
-cluster: $ enroot start  \
-           --mount /work/tesi_ocarpentiero/brats3d/pseudo_random/original:/input:rw \
-           --mount /work/tesi_ocarpentiero/brats3d/pseudo_random/recon:/output:rw \
-           brats_2025
+After downloading, prepare the 3d original dataset following this structure:
+```
+work_path/
+└── brats3d/
+    ├── train_gli/                  
+    ├── tran_met/                 
+    ├── train_met_add/              
+    ├── val_gli/              
+    └── val_met/                 
+```
+Remember to edit the file paths in the code you are using!
+In the validation dataset, segmentations are missing. We obtained good quality segmentations, 
+used only during the training phase, using nnunet. You can obtain them using the newly released 
+brats package too. Make sure to get those segmentations before jumping to the next step.
+After downloading the dataset, you will have to slice it, running
+```src/data/dataset_slicer.py```. \
+This will create the 2d dataset directories, following the sctructure:
 
+```
+work_path/
+├── brats2d_axi/
+│   ├── train_gli/                   
+│   ├── tran_met/                    
+│   ├── train_met_add/               
+│   ├── val_gli/             
+│   └── val_met/     
+├── brats2d_cor/
+│   ├── train_gli/                   
+│   ├── tran_met/                    
+│   ├── train_met_add/               
+│   ├── val_gli/             
+│   └── val_met/  
+├── brats2d_sag/
+│   ├── train_gli/                   
+│   ├── tran_met/                    
+│   ├── train_met_add/               
+│   ├── val_gli/             
+│   └── val_met/  
+└── brats3d/
+    ├── train_gli/                  
+    ├── tran_met/                 
+    ├── train_met_add/              
+    ├── val_gli/              
+    └── val_met/ 
+```
+## 3. Validation
+To get the segmentation scores on the official validation dataset, you will have to obtain 
+segmentation pseudo-labels first. You can reuse the ones from the data preparation step.
+Put the obtained segmentations into ```/work_path/brats3d/pseudo_random/gli_segmentations``` and 
+```/work_path/brats3d/pseudo_random/gli_segmentations```. Remember to replace ```/work_path``` with your
+actual work directory in the source code. For the segmentation part of the 3d validation phase, 
+since it is from the brats python package, a cuda capable gpu is mandatory.
+
+## 4. Training
+If you bravely want to train the model, the available code uses pytorch and accelerate and using
+cuda capable gpus is mandatory (since training it on cpu would take ages). Please, check the cuda compute
+capability of your system before using advanced features such as AMP, model compilation and flash attention. \
+link --> https://developer.nvidia.com/cuda-gpus 
+
+### Wandb
+Wandb is included in the training script. To make it work, make sure to log it into
+wandb from you terminal.
+
+### Resources
+The model was trained on 2/4 NVIDIA L40S (48GB each). 
+Adjust your settings and your batch size accordingly.
+
+## 5. Issues?
+Feel free to contact me at: ```269868@studenti.unimore.it``` if you got any issues
+running the code.

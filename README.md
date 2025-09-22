@@ -93,6 +93,13 @@ wandb from you terminal.
 The model was trained on 2/4 NVIDIA L40S (48GB each). 
 Adjust your settings and your batch size accordingly.
 
-## 5. Issues?
+## 5 Checkpoints
+You can find the best checkpoints at: https://drive.google.com/drive/folders/1u7mJN9BZ-a5HLz8IMDrU0T1P3UEYGGe7?usp=sharing
+Initialize your model like:
+```model = HFGAN(dim=64, num_inputs=4, num_outputs=1, dim_mults=(1,2,4,8,10), n_layers=4, skip=True, blocks=False,grouped_encoder=grouped_encoder, infuse_view=False)```
+Where:
+''grouped_encoder == True''' if you want to run a checkpoint from run24, '''False''' otherwhise.
+
+## 6. Issues?
 Feel free to contact me at: ```269868@studenti.unimore.it``` if you got any issues
 running the code.
